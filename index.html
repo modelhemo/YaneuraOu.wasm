@@ -1,0 +1,41 @@
+<script src="yaneuraou.js"></script>
+<script>
+  YaneuraOu().then((yn) => {
+    window.yn = yn;
+    let isReady = false;
+    let depth = 5;
+    const listener = function (line) {
+      console.log(">", line);
+      if (line === "readyok") {
+        isReady = true;
+      }
+      if (line.includes("bestmove") && depth < 20) {
+        depth++;
+        console.log("============ DEPTH " + depth + " ============");
+        yn.postMessage("go depth " + depth);
+      }
+    };
+
+    yn.addMessageListener(listener);
+
+    yn.postMessage("usi");
+    const hardwareConcurrency = navigator.hardwareConcurrency;
+    console.log("your hardware concurrency is " + hardwareConcurrency);
+    setTimeout(() => {
+      yn.postMessage("setoption name USI_Ponder value false");
+      yn.postMessage("setoption name USI_OwnBook value false");
+      yn.postMessage("setoption name USI_Hash value 1024");
+      yn.postMessage(`setoption name Threads value ${hardwareConcurrency}`);
+      yn.postMessage("isready");
+    }, 1);
+    setInterval(() => {
+      if (isReady) {
+        yn.postMessage(
+          "position sfen ln1g5/1r4k2/p2pppn2/2ps2p2/1p7/2P6/PPSPPPPLP/2G2K1pr/LN4G1b b BG2SLPnp 1"
+        );
+        yn.postMessage("go depth " + depth);
+        isReady = false;
+      }
+    }, 1000);
+  });
+</script>

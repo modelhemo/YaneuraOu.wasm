@@ -119,7 +119,12 @@ inline uint64_t PEXT64(uint64_t a, uint64_t b) { return pext(a, b); }
 #define POPCNT32(a) _mm_popcnt_u32(a)
 #define POPCNT64(a) _mm_popcnt_u64(a)
 #else
-#define POPCNT32(a) _mm_popcnt_u32((u32)(a))
+
+// yaneuraou.wasm
+// WASM SIMDを使用するため、__builtin_popcountをcallするよう修正
+// https://github.com/emscripten-core/emscripten/issues/10634
+
+#define POPCNT32(a) __builtin_popcount((u32)(a))
 // 32bit環境では32bitのpop_count 2回でemulation。
 #define POPCNT64(a) (POPCNT32((a)>>32) + POPCNT32(a))
 #endif
@@ -171,7 +176,7 @@ FORCE_INLINE int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _B
 FORCE_INLINE int MSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v >> 32) ? 32 + MSB32(uint32_t(v >> 32)) : MSB32(uint32_t(v)); }
 #endif
 
-#elif defined(__GNUC__) && ( defined(__i386__) || defined(__x86_64__) || defined(__ANDROID__) )
+#elif defined(__GNUC__) && ( defined(__i386__) || defined(__x86_64__) || defined(__ANDROID__) || defined(__EMSCRIPTEN__))
 
 FORCE_INLINE int LSB32(const u32 v) { ASSERT_LV3(v != 0); return __builtin_ctzll(v); }
 FORCE_INLINE int LSB64(const u64 v) { ASSERT_LV3(v != 0); return __builtin_ctzll(v); }

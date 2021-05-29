@@ -28,13 +28,11 @@ int main(int argc, char* argv[])
 	//Search::clear();
 	Eval::init();
 
-	// USIコマンドの応答部
+  // yaneuraOu.wasm
+	// ここでループしてしまうと、ブラウザのメインスレッドがブロックされてしまうため、コメントアウト
 
-	USI::loop(argc, argv);
-
-	// 生成して、待機させていたスレッドの停止
-
-	Threads.set(0);
+	// USI::loop(argc, argv);
+	// Threads.set(0);
 
 	return 0;
 }

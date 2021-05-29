@@ -7,8 +7,20 @@ ThreadPool Threads;		// Global object
 
 Thread::Thread(size_t n) : idx(n) , stdThread(&Thread::idle_loop, this)
 {
+	// yaneuraou.wasm
+	// wait_for_search_finished すると、ブラウザのメインスレッドをブロックしデッドロックが発生するため、コメントアウト。
+	//
+	// 新しいスレッドが cv を設定するのを待ってから、ブラウザに処理をパスしたいが、
+	// 新しいスレッド用のworkerを作成するためには、いったんブラウザに処理をパスする必要がある。
+	//
+	// https://bugzilla.mozilla.org/show_bug.cgi?id=1049079
+	//
+	// threadStarted という変数を設けて全てのスレッドが開始するまでリトライするようにする
+	//
+	// 参考：https://github.com/niklasf/stockfish.wasm/blob/a022fa1405458d1bc1ba22fe813bace961859102/src/thread.cpp#L38
+
 	// スレッドはsearching == trueで開始するので、このままworkerのほう待機状態にさせておく
-	wait_for_search_finished();
+	// wait_for_search_finished();
 }
 
 // std::threadの終了を待つ
@@ -86,6 +98,7 @@ void Thread::idle_loop() {
 	{
 		std::unique_lock<std::mutex> lk(mutex);
 		searching = false;
+		threadStarted = true;
 		cv.notify_one(); // 他のスレッドがこのスレッドを待機待ちしてるならそれを起こす
 		cv.wait(lk, [&] { return searching; });
 
@@ -102,18 +115,24 @@ void Thread::idle_loop() {
 // スレッド数を変更する。
 void ThreadPool::set(size_t requested)
 {
+	// yaneuraou.wasm
+	// ブラウザのメインスレッドをブロックしないようstockfish.wasmと同様の実装に修正
+	//
+
+  if (size() == requested)
+      return;
+
 	if (size() > 0) { // いったんすべてのスレッドを解体(NUMA対策)
 		main()->wait_for_search_finished();
 
-		while (size() > 0)
+		while (size() > requested)
 			delete back(), pop_back();
 	}
 
 	if (requested > 0) { // 要求された数だけのスレッドを生成
-		push_back(new MainThread(0));
 
 		while (size() < requested)
-			push_back(new Thread(size()));
+      push_back(size() ? new Thread(size()) : new MainThread(0));
 		clear();
 
 		// Reallocate the hash with the new threadpool size

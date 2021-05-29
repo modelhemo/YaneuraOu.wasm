@@ -5,6 +5,8 @@
 #include "thread.h"
 #include "tt.h"
 
+#include <emscripten.h>
+
 #include <sstream>
 #include <queue>
 
@@ -300,6 +302,9 @@ u64 eval_sum;
 // 局面は初期化されないので注意。
 void is_ready(bool skipCorruptCheck)
 {
+  // yaneuraou.wasm
+	// ブラウザのメインスレッドをブロックしないよう、Keep Alive処理をコメントアウト
+	//
 
 	// --- Keep Alive的な処理 ---
 
@@ -316,36 +321,37 @@ void is_ready(bool skipCorruptCheck)
 	// 確認してから処理を行う。
 
 	// スレッドが起動したことを通知するためのフラグ
-	auto thread_started = false;
+	// auto thread_started = false;
 
 	// この関数を抜ける時に立つフラグ(スレッドを停止させる用)
-	auto thread_end = false;
+	// auto thread_end = false;
 
-	// 定期的な改行送信用のスレッド
-	auto th = std::thread([&] {
-		// スレッドが起動した
-		thread_started = true;
 
-		int count = 0;
-		while (!thread_end)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			if (++count >= 50 /* 5秒 */)
-			{
-				count = 0;
-				sync_cout << sync_endl; // 改行を送信する。	
+	// // 定期的な改行送信用のスレッド
+	// auto th = std::thread([&] {
+	// 	// スレッドが起動した
+	// 	thread_started = true;
 
-				// 定跡の読み込み部などで"info string.."で途中経過を出力する場合、
-				// sync_cout ～ sync_endlを用いて送信しないと、この改行を送るタイミングとかち合うと
-				// 変なところで改行されてしまうので注意。
-			}
-		}
-		});
-	SCOPE_EXIT({ thread_end = true; th.join(); });
+	// 	int count = 0;
+	// 	while (!thread_end)
+	// 	{
+	// 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	// 		if (++count >= 50 /* 5秒 */)
+	// 		{
+	// 			count = 0;
+	// 			sync_cout << sync_endl; // 改行を送信する。	
+
+	// 			// 定跡の読み込み部などで"info string.."で途中経過を出力する場合、
+	// 			// sync_cout ～ sync_endlを用いて送信しないと、この改行を送るタイミングとかち合うと
+	// 			// 変なところで改行されてしまうので注意。
+	// 		}
+	// 	}
+	// 	});
+	// SCOPE_EXIT({ thread_end = true; th.join(); });
 
 	// スレッド起動待ち
-	while (!thread_started)
-		Tools::sleep(100);
+	// while (!thread_started)
+	// 	Tools::sleep(100);
 
 	// --- Keep Alive的な処理ここまで ---
 
@@ -556,17 +562,21 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states , bool
 	bool ponderMode = false;
 
 	auto main_thread = Threads.main();
-	if (!states)
-	{
-		// 前回から"position"コマンドを処理せずに再度goが呼び出された。
-		// 前回、ponderでStochastic Ponderのために局面を壊してしまっている可能性があるので復元しておく。
-		// (これがStochastic Ponderの一番簡単な実装)
-		// Stochastic Ponderのために局面を2手前に戻して、そのあと現在の局面に対するコマンド("d"など)を実行すると
-		// それは2手前の局面が表示されるが、それは仕様であるものとする。(これを修正するとプログラムのフローが複雑になる)
-		istringstream iss(main_thread->last_position_cmd_string);
-		iss >> token; // "position"
-		position_cmd(*const_cast<Position*>(&pos), iss, states);
-	}
+
+	// yaneuraou.wasm
+	// 複数回"go"コマンドが呼ばれた際に誤って初期化されてしまうため、コメントアウト
+
+	// if (!states)
+	// {
+	// 	// 前回から"position"コマンドを処理せずに再度goが呼び出された。
+	// 	// 前回、ponderでStochastic Ponderのために局面を壊してしまっている可能性があるので復元しておく。
+	// 	// (これがStochastic Ponderの一番簡単な実装)
+	// 	// Stochastic Ponderのために局面を2手前に戻して、そのあと現在の局面に対するコマンド("d"など)を実行すると
+	// 	// それは2手前の局面が表示されるが、それは仕様であるものとする。(これを修正するとプログラムのフローが複雑になる)
+	// 	istringstream iss(main_thread->last_position_cmd_string);
+	// 	iss >> token; // "position"
+	// 	position_cmd(*const_cast<Position*>(&pos), iss, states);
+	// }
 
 	// 思考開始時刻の初期化。なるべく早い段階でこれをしておかないとサーバー時間との誤差が大きくなる。
 	Time.reset();
@@ -1181,4 +1191,60 @@ Move16 USI::to_move16(const string& str)
 
 END:
 	return move;
+}
+
+
+
+// --------------------
+// EMSCRIPTEN support
+// --------------------
+
+EMSCRIPTEN_KEEPALIVE extern "C" int usi_command(const char *c_cmd) {
+  std::string cmd(c_cmd);
+
+  static Position pos;
+  string token;
+  static StateListPtr states(new StateList(1));;
+
+  for (Thread* th : Threads) {
+      if (!th->threadStarted)
+          return 1;
+  }
+
+      istringstream is(cmd);
+
+      token.clear(); // Avoid a stale if getline() returns empty or blank line
+      is >> skipws >> token;
+
+      if (    token == "quit"
+          ||  token == "stop")
+          Threads.stop = true;
+
+      // The GUI sends 'ponderhit' to tell us the user has played the expected move.
+      // So 'ponderhit' will be sent if we were told to ponder on the same move the
+      // user has played. We should continue searching but switch from pondering to
+      // normal search.
+      else if (token == "ponderhit")
+          Threads.main()->ponder = false; // Switch to normal search
+
+      else if (token == "usi")
+          sync_cout << "id name " << engine_info()
+                    << "\n"       << Options
+                    << "\nusiok"  << sync_endl;
+
+      else if (token == "setoption")  setoption_cmd(is);
+      else if (token == "go")         go_cmd(pos, is, states);
+      else if (token == "position")   position_cmd(pos, is, states);
+      else if (token == "usinewgame") return 0;
+      else if (token == "isready")    is_ready_cmd(pos,states);
+
+      // Additional custom non-UCI commands, mainly for debugging.
+      // Do not use these commands during a search!
+			else if (token == "bench") bench_cmd(pos, is);
+      else if (token == "d")        sync_cout << pos << sync_endl;
+      else if (token == "compiler") sync_cout << compiler_info() << sync_endl;
+      else
+          sync_cout << "Unknown command: " << cmd << sync_endl;
+
+  return 0;
 }
