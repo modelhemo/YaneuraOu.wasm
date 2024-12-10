@@ -2,7 +2,7 @@
 <script src="coi-serviceworker.js"></script>
 <script src="yaneuraou.halfkp.js"></script>
 <script>
-  const text=document.getElementById("text");
+  //const text=document.getElementById("text");
   YaneuraOu_HalfKP().then((yn) => {
     window.yn = yn;
     let isReady = false;
@@ -24,7 +24,7 @@
     yn.postMessage("usi");
     const hardwareConcurrency = navigator.hardwareConcurrency;
     console.log("your hardware concurrency is " + hardwareConcurrency);
-    text.innerHTML+=hardwareConcurrency+"¥n";
+    //text.innerHTML+=hardwareConcurrency+"¥n";
     setTimeout(() => {
       yn.postMessage("setoption name USI_Ponder value false");
       yn.postMessage("setoption name USI_OwnBook value false");
