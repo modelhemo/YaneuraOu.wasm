@@ -1,6 +1,8 @@
-<script src="yaneuraou.js"></script>
+<div id="text"></div>
+<script src="yaneuraou.halfkp.js"></script>
 <script>
-  YaneuraOu().then((yn) => {
+  const text=document.getElementById("text");
+  YaneuraOu_HalfKP().then((yn) => {
     window.yn = yn;
     let isReady = false;
     let depth = 5;
@@ -21,6 +23,7 @@
     yn.postMessage("usi");
     const hardwareConcurrency = navigator.hardwareConcurrency;
     console.log("your hardware concurrency is " + hardwareConcurrency);
+    text.innerHTML+=hardwareConcurrency+"¥n";
     setTimeout(() => {
       yn.postMessage("setoption name USI_Ponder value false");
       yn.postMessage("setoption name USI_OwnBook value false");
